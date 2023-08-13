@@ -26,20 +26,13 @@ import {
 } from "./ui/select";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
-import { Wand2 } from "lucide-react";
+import { Loader2Icon, Wand2 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { useToast } from "./ui/use-toast";
+import { useRouter } from "next/navigation";
+import { companionCreationSchema } from "@/lib/schemas";
 
-const formSchema = z.object({
-  name: z.string().min(1, { message: "Name is required." }),
-  description: z.string().min(1, { message: "Description is required." }),
-  instructions: z
-    .string()
-    .min(200, { message: "Instructions require at least 200 characters" }),
-  seed: z.string().min(1, { message: "Seed require at least 200 characters" }),
-  src: z.string().min(1, { message: "Image is required." }),
-  categoryId: z.string().min(1, { message: "Category is required." }),
-});
-
-type Form = z.infer<typeof formSchema>;
+type FormSchema = z.infer<typeof companionCreationSchema>;
 
 type Props = {
   initialCompanion: Companion | null | undefined;
@@ -63,8 +56,11 @@ Elon: Always! But right now, I'm particularly excited about Neuralink. It has th
 `;
 
 const CompanionForm = ({ categories, initialCompanion }: Props) => {
-  const form = useForm<Form>({
-    resolver: zodResolver(formSchema),
+  const { toast } = useToast();
+  const router = useRouter();
+
+  const form = useForm<FormSchema>({
+    resolver: zodResolver(companionCreationSchema),
     defaultValues: initialCompanion || {
       name: "",
       description: "",
@@ -75,10 +71,36 @@ const CompanionForm = ({ categories, initialCompanion }: Props) => {
     },
   });
 
-  const isLoading = form.formState.isSubmitting;
+  const addCompanion = (data: FormSchema) =>
+    fetch("/api/companion", { method: "POST", body: JSON.stringify(data) });
+  const editCompanion = (companionId: string, data: FormSchema) =>
+    fetch(`/api/companion/${companionId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
 
-  const onSubmit = (data: Form) => {
-    console.log(data);
+  const { mutate, isLoading } = useMutation({
+    mutationFn: (data: FormSchema) =>
+      initialCompanion
+        ? editCompanion(initialCompanion.id, data)
+        : addCompanion(data),
+    onError: (err: any) => {
+      console.log(err);
+      toast({
+        variant: "destructive",
+        description: "Something went wrong",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        description: "Success",
+      });
+      router.push("/");
+    },
+  });
+
+  const onSubmit = (data: FormSchema) => {
+    mutate(data);
   };
 
   return (
@@ -246,10 +268,21 @@ const CompanionForm = ({ categories, initialCompanion }: Props) => {
           />
           <div className="w-full flex justify-center">
             <Button size="lg" disabled={isLoading}>
-              {initialCompanion
-                ? "Edit your companion"
-                : "Create your companion"}{" "}
-              <Wand2 className="w-4 h-4 ml-2" />
+              {isLoading ? (
+                <>
+                  {initialCompanion
+                    ? "Editing your companion"
+                    : "Creating your companion"}
+                  <Loader2Icon className="w-4 h-4 ml-2 animate-spin" />
+                </>
+              ) : (
+                <>
+                  {initialCompanion
+                    ? "Edit your companion"
+                    : "Create your companion"}
+                  <Wand2 className="w-4 h-4 ml-2" />
+                </>
+              )}
             </Button>
           </div>
         </form>
