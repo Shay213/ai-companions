@@ -1,5 +1,6 @@
 import CompanionForm from "@/components/CompanionForm";
 import { prisma } from "@/lib/prismadb";
+import { auth, redirectToSignIn } from "@clerk/nextjs";
 import React from "react";
 
 type Props = {
@@ -10,12 +11,17 @@ type Props = {
 
 const Companion = async ({ params: { companionId } }: Props) => {
   // TODO: Check subscription
+  const { userId } = auth();
+
+  if (!userId) {
+    return redirectToSignIn();
+  }
 
   const companionPromise =
     companionId === "new"
       ? undefined
       : prisma.companion.findUnique({
-          where: { id: companionId },
+          where: { id: companionId, userId },
         });
   const categoriesPromise = prisma.category.findMany();
 

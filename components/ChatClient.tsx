@@ -1,16 +1,13 @@
+"use client";
+
 import { Companion, Message } from "@prisma/client";
-import React from "react";
-import { Button, buttonVariants } from "./ui/button";
-import { ChevronLeft, MessagesSquare, MoreVertical } from "lucide-react";
-import Link from "next/link";
-import BotAvatar from "./BotAvatar";
-import { auth } from "@clerk/nextjs";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
-import CompanionOwnerActions from "./CompanionOwnerActions";
+import React, { FormEvent, useState } from "react";
+import ChatHeader from "./ChatHeader";
+import { useRouter } from "next/navigation";
+import { useCompletion } from "ai/react";
+import ChatForm from "./ChatForm";
+import ChatMessages from "./ChatMessages";
+import { ChatMessageProps } from "./ChatMessage";
 
 type Props = {
   companion: Companion & {
@@ -21,60 +18,51 @@ type Props = {
   };
 };
 
-const ChatHeader = ({ companion }: Props) => {
-  const { userId } = auth();
-  return (
-    <div className="flex w-full justify-between items-center border-b border-primary/10 pb-4">
-      <div className="flex gap-x-2 items-center">
-        <Link
-          href="/"
-          className={buttonVariants({ size: "icon", variant: "ghost" })}
-        >
-          <ChevronLeft className="h-8 w-8" />
-        </Link>
-        <BotAvatar src={companion.src} />
-        <div className="flex flex-col gap-y-1">
-          <div className="flex items-center gap-x-2">
-            <p className="font-bold">{companion.name}</p>
-            <div className="flex items-center text-xs text-muted-foreground">
-              <MessagesSquare className="w-3 h-3 mr-1" />
-              {companion._count.messages}
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Created by @{companion.userName}
-          </p>
-        </div>
-      </div>
-      {userId === companion.userId && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="secondary" size="icon">
-              <MoreVertical />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <CompanionOwnerActions
-              config={{
-                edit: { redirectHref: `/companion/${companion.id}` },
-                delete: {
-                  callAPI: `/api/companion/${companion.id}`,
-                  methodAPI: "DELETE",
-                  successAPIRedirect: "/",
-                },
-              }}
-            />
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-    </div>
-  );
-};
-
 const ChatClient = ({ companion }: Props) => {
+  const router = useRouter();
+  const [messages, setMessages] = useState<ChatMessageProps[]>(
+    companion.messages
+  );
+
+  const { input, isLoading, handleInputChange, handleSubmit, setInput } =
+    useCompletion({
+      api: `/api/chat/${companion.id}`,
+      onFinish(prompt, completion) {
+        const systemMessage: ChatMessageProps = {
+          role: "system",
+          content: completion,
+        };
+
+        setMessages((prev) => [...prev, systemMessage]);
+        setInput("");
+        router.refresh();
+      },
+    });
+
+  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
+    const userMessage: ChatMessageProps = {
+      role: "user",
+      content: input,
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    handleSubmit(e);
+  };
+
   return (
     <div className="flex flex-col h-full p-4 space-y-2">
       <ChatHeader companion={companion} />
+      <ChatMessages
+        companion={companion}
+        isLoading={isLoading}
+        messages={messages}
+      />
+      <ChatForm
+        isLoading={isLoading}
+        input={input}
+        handleInputChange={handleInputChange}
+        onSubmit={onSubmit}
+      />
     </div>
   );
 };
