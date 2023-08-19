@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs";
+import { auth, currentUser } from "@clerk/nextjs";
 import { NextResponse } from "next/server";
 import { companionCreationSchema } from "@/lib/schemas";
 import { ZodError } from "zod";
@@ -40,9 +40,37 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json(companion);
+    return new NextResponse(JSON.stringify(companion), { status: 200 });
   } catch (error) {
     console.log("[COMPANION_PATCH]", error);
+    if (error instanceof ZodError) {
+      return new NextResponse("Missing or invalid fields", { status: 400 });
+    }
+    return new NextResponse("Internal Error", { status: 500 });
+  }
+}
+
+export async function DELETE(
+  req: Request,
+  { params: { companionId } }: { params: { companionId: string } }
+) {
+  try {
+    const { userId } = auth();
+
+    if (!userId) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    const companion = await prisma.companion.delete({
+      where: {
+        userId,
+        id: companionId,
+      },
+    });
+
+    return new NextResponse(JSON.stringify(companion), { status: 200 });
+  } catch (error) {
+    console.log("[COMPANION_DELETE]", error);
     if (error instanceof ZodError) {
       return new NextResponse("Missing or invalid fields", { status: 400 });
     }

@@ -52,5 +52,5 @@ model Message {
 
   companionId String    @db.ObjectId
   companion   Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
-  userId      String    @db.ObjectId
+  userId      String    @unique
 }

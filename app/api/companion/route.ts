@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json(companion);
+    return new NextResponse(JSON.stringify(companion), { status: 200 });
   } catch (error) {
     console.log("[COMPANION_POST]", error);
     if (error instanceof ZodError) {
